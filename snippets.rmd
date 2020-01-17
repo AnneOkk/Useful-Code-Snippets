@@ -21,11 +21,10 @@ for(input in inputs) {
 (r <- seq_along(1:3))
              
 ```
-
+<div style="margin-bottom:40px;">
+</div>
 ## R for Data Science 
 ## by Hadley Wickham 
-
-
 ### Exercises Chapter 1: Data visualization with ggplot2
 ```{r include = T}
 ## p. 6
@@ -65,8 +64,6 @@ ggplot(mpg, aes(x = displ, y = hwy, colour = displ < 6)) +
 
 
 ```
-
-
 
 ### Exercises Chapter 3: Data transformation with dplyr 
 ** *filter* - choose certain variables only, like filter(flights, month >= 7, month <= 9)
@@ -227,6 +224,9 @@ fastest_flights <- select(
 )
 head(arrange(fastest_flights, desc(mph)))
 
+```
+
+```{r include = T, echo = T}
 ### Exercises
 names(flights)
 desti <- dplyr::group_by(flights, dep_delay, arr_delay, origin)
@@ -324,59 +324,132 @@ names(flights)
     arr_delay = sum(arr_delay),
     flights = n()
   )))
-  # Total delay within each origin dest
+# Total delay within each origin dest
 tam <-  group_by(bam, origin, dest) %>%
   mutate(
     arr_delay_total = sum(arr_delay),
     flights_total = sum(flights))
-  # average delay of each carrier - average delay of other carriers
-  tam %>%
+# average delay of each carrier - average delay of other carriers
+tam %>%
   mutate(
     arr_delay_others = (arr_delay_total - arr_delay) /
       (flights_total - flights),
     arr_delay_mean = arr_delay / flights,
     arr_delay_diff = arr_delay_mean - arr_delay_others
   ) %>%
-  # remove NaN values (when there is only one carrier)
-  filter(is.finite(arr_delay_diff)) %>%
-  # average over all airports it flies to
-  group_by(carrier) %>%
+# remove NaN values (when there is only one carrier)
+filter(is.finite(arr_delay_diff)) %>%
+# average over all airports it flies to
+group_by(carrier) %>%
   summarise(arr_delay_diff = mean(arr_delay_diff)) %>%
   arrange(desc(arr_delay_diff))
 
-  ?is.finite
-  ## remove NaN with is.finite()
+?is.finite
+## remove NaN with is.finite()
   
+## What does the sort argument count() do? 
+# It sorts the results in order of n. You could use this anytime you would run count() followed by arrange()
   
-  ## What does the sort argument count() do? 
-  # It sorts the results in order of n. You could use this anytime you would run count() followed by arrange()
+count(flights)
   
-  count(flights)
+## Grouped Mutates (and filters)
+# Grouping is most useful in conjunction with summarise(), but you can also use it with mutate() and 
+# filter()
   
+# find the worst members in a group
   
-  ### Grouped Mutates (and filters)
-  # Grouping is most useful in conjunction with summarise(), but you can also use it with mutate() and 
-  # filter()
+flights %>%
+  group_by(year, month, day) %>%
+  select(year, month, day, arr_delay, carrier) %>%
+  filter(rank(desc(arr_delay)) < 10 )
   
-  # find the worst members in a group
-  
-  flights %>%
-    group_by(year, month, day) %>%
-    select(year, month, day, arr_delay, carrier) %>%
-    filter(rank(desc(arr_delay)) < 10 )
-  
-  ## find all groups bigger than a threshold 
-  
+## find all groups bigger than a threshold 
+names(flights)
+(popular_dest <- flights %>%
+    group_by(dest) %>%
+    filter(n() > 365) %>%
+    summarize(mean = mean(arr_delay, na.rm =T))) 
+head(arrange(popular_dest, desc(mean)))
+      
+names(flights)
+(unpopular_dest <- flights %>%
+group_by(dest) %>%
+    filter(n() < 365) %>%
+    summarize(mean = mean(arr_delay, na.rm =T))) 
+head(arrange(unpopular_dest, desc(mean)))
+      
+## standardize to compute per group metrics:
+(popular_dest <- flights %>% 
+    filter(arr_delay > 0) %>%
+    mutate(prop_delay = arr_delay/ sum(arr_delay)) %>%
+    select(year:day, dest, arr_delay, prop_delay))
+      
+## a grouped filter is a grouped mutate followed by an ungrouped filter 
+# functions that work most naturally in grouped mutates and filters are called 
+# window functions (versus summary functions for summaries)
+
+vignette("window-functions")
+
 ```
 
-## Including Plots
+**How do mutate and filtering functions change when combined with grouping?**
+** Summary functions (mean()), offset functions (lead(), lag()), ranking functions (min_rank(), row_number()), operate within each group when used with group_by() in mutate() or filter(). Arithmetic operators (+, -), logical operators (<, ==), modular arithmetic operators (%%, %/%), logarithmic functions (log) are not affected by group_by.
+\n
+** Summary functions like mean(), median(), sum(), std() and others covered in the section "Useful Summary Functions" calculate their values within each group when used with mutate() or filter() and group_by().
 
-You can also embed plots, for example:
+```{r include = T, echo=FALSE}
+library(dplyr)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+## different means, depending on whether overall mean is called or group mean (by group_by)
+tibble(
+  x = 1:9,
+  group = rep(c("a", "b", "c"), each = 3)
+) %>%
+  mutate(x_mean = mean(x)) %>%
+  group_by(group) %>%
+  mutate(x_mean_2 = mean(x))
 
-m <- matrix(1:10000, nrow = 100, ncol = 100)
+## Arithmetic operators are not affected by group_by()
+
+tibble(
+  x = 1:9,
+  group = rep(c("a", "b", "c"), each = 3)
+) %>%
+  mutate(y = x + 2) %>%
+  group_by(group) %>%
+  mutate(z = x + 2)
+
+## The modular arithmetic operators %/% and %% are not affected by group_by()
+tibble(
+  x = 1:9,
+  group = rep(c("a", "b", "c"), each = 3)
+) %>%
+  mutate(y = x %% 2) %>%
+  group_by(group) %>%
+  mutate(z = x %% 2)
+
+## The logarithmic functions log(), log2(), and log10() are not affected by group_by().
+
+tibble(
+  x = 1:9,
+  group = rep(c("a", "b", "c"), each = 3)
+) %>%
+  mutate(y = log(x)) %>%
+  group_by(group) %>%
+  mutate(z = log(x))
+
+## The offset functions lead() and lag() respect the groupings in group_by(). The functions lag() and lead() will only return values within each group.
+tibble(
+  x = 1:9,
+  group = rep(c("a", "b", "c"), each = 3)
+) %>%
+  mutate(lag_a = lag(x)) %>%
+  group_by(group) %>%
+  mutate(
+    lag_x = lag(x),
+    lead_x = lead(x)
+  )
+
 
 ```
 
