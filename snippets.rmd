@@ -151,10 +151,17 @@ head(flights$sched_dep_time)
 
 10 %% 2.4
 ```
+<<<<<<< HEAD
 
 #### *counts*
 * whenever you aggregate data, use a count to make sure that you are not making conclusions based on very small amounts of data 
 
+=======
+
+#### *counts*
+* whenever you aggregate data, use a count to make sure that you are not making conclusions based on very small amounts of data 
+
+>>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
 ```{r}
 flights <- nycflights13::flights
 names(flights)
@@ -458,9 +465,15 @@ vignette("window-functions")
   group_by(group) %>%
   mutate(x_cumsum_2 = cumsum(x)))
 ```
+<<<<<<< HEAD
 
 #### Logical comparisons, <, <=, >, >=, !=, and == are not affected by group_by().
 
+=======
+
+#### Logical comparisons, <, <=, >, >=, !=, and == are not affected by group_by().
+
+>>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
 ```{r}
 (tibble(
   x = 1:9,
@@ -482,9 +495,15 @@ vignette("window-functions")
   group_by(group) %>%
   mutate(rnk2 = min_rank(x)))
 ```
+<<<<<<< HEAD
 
 ####  note that arrange() ignores groups when sorting values.
 
+=======
+
+####  note that arrange() ignores groups when sorting values.
+
+>>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
 ```{r}
 (tibble(
   x = runif(9),
@@ -743,9 +762,15 @@ ggplot(data = mpg) +
 ) + 
 coord_flip()
 ```
+<<<<<<< HEAD
 
 #### relationshio between price and carat
 
+=======
+
+#### relationshio between price and carat
+
+>>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
 ```{r}
 ggplot(diamonds, aes(x = carat, y = price)) +
   geom_point()
@@ -1049,6 +1074,7 @@ avg_dest_delays %>%
   coord_quickmap()
 ```
 
+<<<<<<< HEAD
 ### R Programming 
 #### The pipe 
 When the pipe **doesn't** work:
@@ -1143,6 +1169,9 @@ both_na(
   c(NA, NA, 1, 2, NA, NA, 1),
   c(NA, 1, NA, 2, NA, NA, 1))
   ```
+=======
+
+>>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
 
  
 ``` 
