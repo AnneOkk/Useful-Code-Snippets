@@ -1280,6 +1280,7 @@ The function f2 drops the last element of the vector x. A better name for f2 is 
 f3 <- function(x, y) {
   rep(y, length.out = length(x))
 }
+?`if`
 ```
 The function f3 repeats y once for each element of x.
 length.out = desired length of the sequence 
@@ -1293,6 +1294,118 @@ If named rnorm(), and dnorm(), the naming convention groups functions by the act
 * r functions always sample from distributions: for example, rnorm(), rbinom(), runif(), and rexp().
 * d functions calculate the probability density or mass of a distribution: For example, dnorm(), dbinom(), dunif(), and dexp().
 R distributions use this latter naming convention.
+
+### Conditional Execution 
+```{r}
+has_name <- function(x) {
+  nms <- names(x)
+  if (is.null(nms)) {
+    rep(FALSE, length(x))
+  } else {
+    !is.na(nms) & nms != ""
+  }
+}
+
+name_df <- c(1:5)
+names(name_df) = c("hh", "ll", NA, NA, "ll")
+attributes(name_df)
+has_name(name_df)
+
+?rep
+
+```
+#### Conditions
+* || or && to combine multiple logical expressions 
+* never use | or & inside if statements! (these are vectorized operations that apply to multiple values)
+* if you do not have a logical vector, you can use any() or all() to collapse it to a single value 
+* == is vectorized (more than one output) > check whether input is 1 or use all() or any() or use identical()
+  + identical() is very strict! it returns a single TRUE or FALSE and doesn't coerce types 
+
+```{r}
+identical(0L, 0)
+
+```
+#### Switch function 
+* Evaluate section code based on position number
+```{r}
+switch(2,"red","green","blue")
+switch_try <- function(op, x, y) {
+  switch(op, 
+         plus = x + y,
+         minus = x - y,
+         times = x * y, 
+         divide = x / y, 
+         stop("Unknown op!")
+       )
+}
+
+
+switch_try(1, 2, 3)
+
+switch("length", "color" = "red", "shape" = "square", "length" = 5)
+```
+#### Cut function 
+*  cut() function divides a numeric vector into different ranges. 
+```{r}
+x <- rnorm(100)
+x
+
+##  Divide the data into ranges -4 ~ 4:
+c <- cut(x, breaks = -4:4)
+c
+```
+### Exercises 
+
+1. What is the difference between if and ifelse?
+
+```{r}
+ ifelse(3 > 2, 1:3, length(1:3)) 
+ if (3 > 2) 1:3 else length(1:3) 
+```
+* ifelse returns the "shape" of the first argument
+* In your ifelse the shape of "3 > 2" is a vector of length one, so it will return a vector length one.
+* The keyword if tests a single condition, while ifelse() tests each element.
+
+2. Write a greeting function that says “good morning”, “good afternoon”, or “good evening”, depending on the time of day. (Hint: use a time argument that defaults to lubridate::now(). That will make it easier to test your function.)
+```{r}
+greet <- function(time = lubridate::now(tzone = "CET")) {
+  hr <- lubridate::hour(time)
+  if (hr < 12) {
+    print("Good morning!")
+  } else if (hr < 17) {
+    print("Good afternoon!")
+  } else {
+    print("Good evening!")
+  }
+}
+```
+3. Implement a fizzbuzz() function. It takes a single number as input. If the number is divisible by three, it returns “fizz”. If it’s divisible by five it returns “buzz”. If it’s divisible by three and five, it returns “fizzbuzz”. Otherwise, it returns the number. Make sure you first write working code before you create the function.
+
+A more concise way of checking for divisibility is to note that the not operator will return TRUE for 0, and FALSE for all non-zero numbers. Thus, !(x %% y), will check whether y divides x.
+```{r}
+fizzbuzz <- function(x) {
+  # these two lines check that x is a valid input
+  stopifnot(length(x) == 1)
+  stopifnot(is.numeric(x))
+  if (!(x %% 3) && !(x %% 5)) { ## use && in case of single values 
+    "fizzbuzz"
+  } else if (!(x %% 3)) {
+    "fizz"
+  } else if (!(x %% 5)) {
+    "buzz"
+  } else {
+    # ensure that the function returns a character vector
+    as.character(x)
+  }
+}
+
+```
+
+
+
+
+
+
 
 
 
