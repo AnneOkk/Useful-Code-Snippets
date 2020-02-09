@@ -3,6 +3,7 @@ title: "Snippets"
 author: "Anne"
 date: "8-1-2020"
 output: html_document
+highlight: NULL
 ---
 ### tryCatch
 ```{r setup, include=FALSE}
@@ -1505,14 +1506,392 @@ rbind(
 3. What does the trim argument to mean() do? When might you use it?
 * The trim arguments trims a fraction of observations from each end of the vector (meaning the range) before calculating the mean. This is useful for calculating a measure of central tendency that is robust to outliers.
 
+#### cat()
+```{r}
+args(cat)
+# NOT RUN {
+iter <- stats::rpois(1, lambda = 10)
+iter
+## print an informative message
+cat("iteration = ", iter <- iter + 1, "\n")
+
+## 'fill' and label lines:
+cat(paste(letters, 100* 1:26), fill = TRUE, labels = paste0("{", 1:10, "}:"))
+# }
+
+df <- data.frame(replicate(10,sample(0:22,20,rep=TRUE)))
+df
+show_missings <- function(df) {
+  n <- sum(is.na(df))
+  cat("Missing values: ", n, "\n", sep = "")
+  
+  invisible(df)
+}
+
+show_missings(df)
+
+```
+* Invisible means that the input is still there, it just doesn't get printed out 
+
+#### Create a random data frame
+```{r}
+sample(seq(0, 6, by=.01), 1)
+args(sample)
+seq(0, 6, by=.01)
+args(seq)
+
+props <- function(ncol, nrow, var.names=NULL){
+    if (ncol < 2) stop("ncol must be greater than 1")
+    p <- function(n){
+        y <- 0
+        z <- sapply(seq_len(n-1), function(i) {
+                x <- sample(seq(0, 1-y, by=.01), 1)
+                y <<- y + x
+                return(x)
+            }
+        )
+        w <- c(z , 1-sum(z))
+        return(w)
+    }
+    DF <- data.frame(t(replicate(nrow, p(n = ncol))))
+    if (!is.null(var.names)) colnames(DF) <- var.names
+    return(DF)
+}
+##############
+# TRY IT OUT #
+##############
+props(ncol=5, nrow=5)                                      
+props(ncol=2, nrow=25)                                     
+props(ncol=3, nrow=5, var.names=c("red", "blue", "green"))
 
 
+```
+#### runif() and sample()
+```{r}
+runif(8)
+args(runif)
+args(sample)
+
+sample(seq(1, 30, by = runif(1)), 10)
 
 
+`+` <- function(x, y) {
+  if (runif(1) < 1) {
+    sum(x,y)
+  } else {
+    sum(x, y) * 8
+  }
+}
+table(replicate(1000, 1+2))
+rm(`+`)
 
 
+```
+
+## Chapter 16: Vectors
+### Exercises
+2. Read the source code for dplyr::near() (Hint: to see the source code, drop the ()). How does it work?
+```{r}
+library(tidyverse)
+dplyr::near
+
+```
+Instead of checking for exact equality, it checks that two numbers are within a certain tolerance, tol. By default the tolerance is set to the square root of .Machine$double.eps, which is the smallest floating point number that the computer can represent.
+
+### Exercises
+2. Carefully read the documentation of is.vector(). What does it actually test for? Why does is.atomic() not agree with the definition of atomic vectors above?
+
+The function is.vector() only checks whether the object has no attributes other than names. Thus a list is a vector:
+```{r}
+is.vector(list(a = 1, b = 2))
+```
+But any object that has an attribute (other than names) is not:
+```{r}
+x <- 1:10
+attr(x, "something") <- TRUE
+is.vector(x)
+```
+The idea behind this is that object oriented classes will include attributes, including, but not limited to "class".
+
+The function is.atomic() explicitly checks whether an object is one of the atomic types (“logical”, “integer”, “numeric”, “complex”, “character”, and “raw”) or NULL.
+
+```{r}
+is.atomic(1:10)
+is.atomic(list(a = 1))
+```
+
+The function is.atomic() will consider objects to be atomic even if they have extra attributes.
+```{r}
+is.atomic(x)
+```
+3. Compare and contrast setNames() with purrr::set_names().
+
+The biggest difference between set_names() and setNames() is that set_names() allows for using a function or formula to transform the existing names.
+```{r}
+purrr::set_names(c(a = 1, b = 2, c = 3), ~ toupper(.))
+```
+4. Create functions that take a vector as input and returns:
+1) The last value. Should you use [ or [[?
+```{r}
+vector <- c(1, 4, 6, 2, 8, 7, 2, 9)
+length(vector)
+last_v <- vector[[length(vector)]]
+last_v
+```
+2) The elements at even numbered positions.
+```{r}
+even_indices <- function(x) {
+  if (length(x)) {
+    x[seq_along(x) %% 2 == 0]
+  } else {
+    x
+  }
+}
+
+vector = sample(seq(1,40, by = runif(1)), 10)
+vector
+seq_along(vector)
+seq(vector)
+
+even_indices(numeric())
+even_indices(1)
+even_indices(1:10)
+even_indices(vector)
+even_indices(letters)
 
 
+```
+
+#### lapply()
+```{r}
+x <- list(a = 1:10, beta = exp(-3:3), logic = c(TRUE,FALSE,FALSE,TRUE))
+x
+# compute the list mean for each list element
+lapply(x,mean)
+# median and quartiles for each list element
+lapply(x, quantile, probs = 1:3/4)
+sapply(x, quantile)
+i39 <- sapply(3:9, seq) # list of vectors
+sapply(i39, fivenum)
+
+hist(replicate(100, mean(rexp(10))))
+
+
+```
+3) This function returns a vector with every element except the last.
+```{r}
+except_last <- function(x) {
+  n <- length(x)
+  if(n) {
+    x[seq(1, (length(x) -1))]
+  } else {
+    x
+  }
+}
+except_last(vector)
+
+except_last(1) ## this does not work!]
+# So new try:
+
+except_last2 <- function(x) {
+  n <- length(x)
+  if (n) {
+    x[-n]
+  } else {
+    x
+  }
+}
+
+except_last2(1)
+
+# Yey!
+
+```
+4) Only even numbers 
+```{r}
+even_numbers2 <- function(x) {
+  x[!is.infinite(x) & !is.nan(x) & (x %% 2 == 0)]
+}
+even_numbers2(c(0:4, NA, NaN, Inf, -Inf))
+```
+#### Exercises for loop
+1. Write for loops to: 
+a. Compute the mean of every column in mtcars 
+```{r}
+output <- vector("double", ncol(mtcars))
+names(output) <- names(mtcars)
+for (coli in names(mtcars)) {
+  output[coli] <- mean(mtcars[[coli]])
+}
+
+```
+b. determine the type of each column in nyc flights13::flights 
+* I used a list, not a character vector, since the class of an object can have multiple values. For example, the class of the time_hour column is POSIXct, POSIXt.
+```{r}
+library(nycflights13)
+output <- vector("list", ncol(nycflights13::flights))
+names(output) <- names(nycflights13::flights)
+for (i in names(nycflights13::flights)) {
+  output[[i]] <- class(nycflights13::flights[[i]])
+}
+```
+c. Compute the number of unique values in each column of iris 
+```{r}
+data("iris")
+iris_uniq <- vector("double", ncol(iris))
+names(iris_uniq) <- names(iris)
+for (i in names(iris)) {
+  iris_uniq[i] <- length(unique(iris[[i]]))
+}
+```
+
+d. Gnenerate 10 random normals for each of mu = -10, 0, 10 and 100 
+```{r}
+n <- 10
+# values of the mean
+mu <- c(-10, 0, 10, 100)
+normals <- vector("list", length(mu))
+for (i in seq_along(normals)) {
+  normals[[i]] <- rnorm(n, mean = mu[i])
+}
+normals
+```
+
+2. Eliminate the for loop in each of the following examples by taking advantage of an existing function that works with vectors:
+```{r}
+out <- ""
+for (x in letters) {
+  out <- str_c(out, x)
+}
+out
+
+new_lett <- vector()
+for (x in letters) {
+  new_lett[x] <- paste(x, "hallo")
+}
+
+(new_lett)
+```
+Since str_c() already works with vectors, use str_c() with the collapse argument to return a single string.
+```{r}
+str_c(letters, collapse = "")
+```
+
+
+```{r}
+x <- sample(100)
+sd. <- 0
+for (i in seq_along(x)) {
+  sd. <- sd. + (x[i] - mean(x))^2
+}
+sd. <- sqrt(sd. / (length(x) - 1))
+sd.
+
+```
+We could simply use the sd function.
+```{r}
+sd(x)
+```
+
+```{r}
+x <- runif(100)
+out <- vector("numeric", length(x))
+out[1] <- x[1]
+for (i in 2:length(x)) {
+  out[i] <- out[i - 1] + x[i]
+}
+out
+x
+```
+The code above is calculating a cumulative sum. Use the function cumsum()
+```{r}
+all.equal(cumsum(x), out)
+?all.equal
+```
+Combine your function writing and for loop skills:
+1. Write a for loop that prints() the lyrics to the children’s song “Alice the camel”.
+
+The lyrics for Alice the Camel are:
+
+    Alice the camel has five humps.
+    Alice the camel has five humps.
+    Alice the camel has five humps.
+    So go, Alice, go.
+    
+This verse is repeated, each time with one fewer hump, until there are no humps. The last verse, with no humps, is:   
+
+    Alice the camel has no humps.
+    Alice the camel has no humps.
+    Alice the camel has no humps.
+    Now Alice is a horse.
+
+We’ll iterate from five to no humps, and print out a different last line if there are no humps.
+```{r}
+humps <- c("five", "four", "three", "two", "one", "no")
+alice <- function() {
+  for (i in humps) {
+    cat(str_c("Alice the camel has ", rep(i, 3), " humps.",
+              collapse = "\n"
+              ), "\n")
+    if (i == "no") {
+      cat("Now Alice is a horse. \n")
+    } else {
+      cat("So go, Alice, go. \n")
+    }
+   cat("\n")
+  } 
+}
+
+alice()
+```
+Ten green bottles hanging on the wall,
+Ten green bottles hanging on the wall,
+And if one green bottle should accidentally fall,
+There'll be nine green bottles hanging on the wall.
+
+Nine green bottles hanging on the wall,
+Nine green bottles hanging on the wall,
+And if one green bottle should accidentally fall,
+There'll be eight green bottles hanging on the wall.
+...
+
+One green bottle hanging on the wall,
+One green bottle hanging on the wall,
+And if one green bottle should accidentally fall,
+There'll be no green bottles hanging on the wall. 
+
+```{r}
+?str_c
+?rep
+number <- c("Ten", "Nine", "Eight", "Seven", "Six", "Five", "Four", "Three", "Two")
+and_if <- ("And if one green bottle should accidentally fall,")
+
+bottles <- function() {
+  for (num in number) {
+    cat(str_c(rep(num, 2), " green bottles hanging on the wall", collapse = "\n"), "\n", and_if, "\n", "There'll be", number[2], "green bottles hanging on the wall", "\n", "\n")
+    if (num == "Two") {
+   cat(str_c(rep("One green bottle hanging on the wall", 2), collapse = "\n"), "\n", and_if, "\n", "There'll be no green bottles hanging on the wall", "\n", "\n")     
+    }
+  }
+}
+
+bottles()
+
+library(stringr)
+bottles <- function() {
+  for (i in seq_along(number)) {
+    cat(str_c(rep(number[i], 2), " green bottles hanging on the wall", collapse = "\n"), "\n", and_if, "\n", "There'll be", number[i+1], "green bottles hanging on the wall", "\n", "\n")
+    if (i == length(number)) {
+   cat(str_c(rep("One green bottle hanging on the wall", 2), collapse = "\n"), "\n", and_if, "\n", "There'll be no green bottles hanging on the wall", "\n", "\n")     
+    }
+  }
+}
+
+bottles()
+```
+```{r}
+seq(10,0)
+```
 
 
 
