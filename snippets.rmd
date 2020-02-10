@@ -1860,6 +1860,18 @@ One green bottle hanging on the wall,
 And if one green bottle should accidentally fall,
 There'll be no green bottles hanging on the wall. 
 
+#### str_c()
+```{r}
+str_c("Letter: ", letters)
+str_c("Letter", letters, sep = ": ")
+str_c(letters, " is for", "...")
+str_c(letters[-26], " comes before ", letters[-1])
+
+str_c(letters, collapse = "")
+str_c(letters, collapse = ", ")
+```
+
+
 ```{r}
 ?str_c
 ?rep
@@ -1889,10 +1901,296 @@ bottles <- function() {
 
 bottles()
 ```
+
 ```{r}
 seq(10,0)
 ```
+3. Convert the lyrics of Ninety-Nine Bottles of Beer on the Wall
+```{r}
+## My solution: 
+bottles <- function(n) {
+  if (n > 0) {
+    for (i in seq_along(n)) {
+      cat(str_c(as.character(n[i]), " bottles of beer on the wall,", as.character(n[i]), " bottles of beer.", "\n","Take one down, pass it around, ", as.character(n[i]-1), " bottles of beer on the wall", collapse = "\n"))
+    }
+  } else if (n == 0) {
+    cat(str_c("No more bottles of beer on the wall, no more bottles of beer.",
+              "\n", "We’ve taken them down and passed them around; now we’re drunk and","\n", "passed out!"))
+  }
+}
 
+bottles(0)
 
+## suggested solution:
+bottles <- function(n) {
+  if (n > 1) {
+    str_c(n, " bottles")
+  } else if (n == 1) {
+    "1 bottle"
+  } else {
+    "no more bottles"
+  }
+}
+
+beer_bottles <- function(total_bottles) {
+  # print each lyric
+  for (current_bottles in seq(total_bottles, 0)) {
+    # first line
+    cat(str_to_sentence(str_c(bottles(current_bottles), " of beer on the wall, ", bottles(current_bottles), " of beer.\n")))
+    # second line
+    if (current_bottles > 0) {
+      cat(str_c(
+        "Take one down and pass it around, ", bottles(current_bottles - 1),
+        " of beer on the wall.\n"
+      ))
+    } else {
+      cat(str_c("Go to the store and buy some more, ", bottles(total_bottles), " of beer on the wall.\n"))
+    }
+    cat("\n")
+  }
+}
+beer_bottles(3)
+
+```
+4. It’s common to see for loops that don’t preallocate the output and instead increase the length of a vector at each step:
+
+```{r}
+x = c(10, 8, 2, 7, 20, 34)
+output <- vector("integer", 0)
+for (i in seq_along(x)) {
+  output <- c(output, lengths(x[[i]]))
+}
+output
+```
+How does this affect performance? Design and execute an experiment.
+
+In order to compare these two approaches, I’ll define two functions: add_to_vector will append to a vector, like the example in the question, and add_to_vector_2 which pre-allocates a vector.
+
+```{r}
+add_to_vector <- function(n) {
+  output <- vector("integer", 0)
+  for (i in seq_len(n)) {
+    output <- c(output, i)
+  }
+  output
+}
+
+add_to_vector_2 <- function(n) {
+  output <- vector("integer", n)
+  for (i in seq_len(n)) {
+    output[[i]] <- i
+  }
+  output
+}
+```
+I’ll use the package microbenchmark to run these functions several times and compare the time it takes. The package microbenchmark contains utilities for benchmarking R expressions. In particular, the microbenchmark() function will run an R expression a number of times and time it.
+```{r}
+library(microbenchmark)
+
+timings <- microbenchmark(add_to_vector(10000), add_to_vector_2(10000), times = 10)
+timings
+```
+#### Looping patterns
+1. Loop over elements
+```{r}
+x <- (runif(10))
+x
+names(x) <- letters[1:10]
+for (n in x) {
+  cat(str_c("Hello, this is my random number: ", n, "!\n"))
+}
+```
+2. Loop over numeric indices 
+```{r}
+library(stringr)
+x <- c(runif(10))
+y <- c(1, "v", TRUE, 2, "apple", FALSE)
+names(x) <- letters[1:10]
+one <- "1st"
+two <- "2nd"
+three <- "3rd"
+Hello <- "Hello, this is my "
+And <- ". And this is my "
+
+for (i in seq_along(x)){
+  if(i ==1){
+    cat(str_c(Hello, one, " number: ", x[[i]], "!\n"))  
+  } else if (i == 2) {
+      cat(str_c(Hello, two, " number: ", x[[i]], And, one, "number: ", x[[i-1]])) 
+  } else if (i == 3){
+    cat(str_c("\nHello, this is my 3rd number: ", x[[i]], "! And this is my 2nd number: ", x[[i-1]])) 
+  } else if (i > 3) {
+  cat(str_c("\nHello, this is my ", i, "th ","number: ", x[[i]], "! And this is my ", i-1, "th number: !", x[[i-1]]))
+  }
+}
+
+for (i in seq_along(y)){
+  if(i ==1){
+    cat(str_c(Hello, one, " number: ", y[[i]], "!\n"))  
+  } else if (i == 2) {
+      cat(str_c(Hello, two, " number: ", y[[i]], And, one, " number: ", y[[i-1]])) 
+  } else if (i == 3){
+    cat(str_c("\nHello, this is my 3rd number: ", y[[i]], "! And this is my 2nd number: ", y[[i-1]])) 
+  } else if (i > 3) {
+  cat(str_c("\nHello, this is my ", i, "th ","number: ", y[[i]], "! And this is my ", i-1, "th number:", y[[i-1]]))
+  }
+}
+```
+3. Loop over names
+```{r}
+x <- c(runif(10))
+names(x) <- letters[1:10]
+
+for (name in names(x)) {
+  cat(str_c("Hello, this is the name: ", name, "\n"))
+}
+
+```
+Iteration over numeric indices allows to extract both the name and the value:
+```{r}
+x <- c(runif(10))
+names(x) <- letters[1:10]
+for (i in seq_along(x)) {
+  n <- names(x)[[i]]
+  v <- x[[i]]
+  cat(str_c("This is the name: ", n, "\tand this is the value: ", v, "\n"))
+}
+```
+#### collape argument of str_c
+```{r}
+str_c("Letter: ", letters)
+str_c("Letter", letters, sep = ": ")
+str_c(letters, " is for", "...")
+str_c(letters[-26], " comes before ", letters[-1])
+
+str_c(letters, collapse = "")
+str_c(letters, collapse = ", ")
+```
+#### Unknown output length
+```{r}
+means <- c(0,1)
+output <- double()
+for (i in seq_along(means)) {
+  n <- sample(100,1)
+  output <- c(output, rnorm(n, means[[i]]))
+}
+
+str(output)
+
+## Better: 
+# Save results in a list and combine into single vector after the loop is done
+out <- vector("list", length(means))
+for (i in seq_along(means)) {
+  n <- sample(100, 1)
+  out[[i]] <- rnorm(n, means[[i]])
+}
+
+str(out)
+str(unlist(out))
+out
+
+out[1]
+out[2]
+
+n <- sample(100,1)
+r <- rnorm(10, mean = 6, sd = 2)
+r
+mean(r)
+sd(r)
+
+?rnorm
+```
+#### Unknown sequence length
+```{r}
+flip <- function() sample(c("H", "T"), 1)
+flip()
+
+flips <- 0
+heads <- 0
+  
+while(flips < 10) {
+  result <- flip()
+  flips <- flips + 1
+  if (result == "H") {
+    cat("Yeah, heads!\n")
+    heads <- heads + 1
+  }
+}
+
+print(heads)
+
+```
+## Exercises 
+#### Read in multiple files in a for loop
+```{r}
+files <- dir("data/", pattern = "\\.csv$", full.names = TRUE)
+```
+Since, the number of files is known, pre-allocate a list with a length equal to the number of files.
+```{r}
+df_list <- vector("list", length(files))
+```
+Then, read each file into a data frame, and assign it to an element in that list. The result is a list of data frames.
+```{r}
+for (i in seq_along(files)) {
+  df_list[[i]] <- read_csv(files[[i]])
+}
+```
+Finally, use use bind_rows() to combine the list of data frames into a single data frame.
+```{r}
+df <- bind_rows(df_list)
+```
+Alternatively, I could have pre-allocated a list with the names of the files.
+```{r}
+df2_list <- vector("list", length(files))
+names(df2_list) <- files
+for (fname in files) {
+  df2_list[[fname]] <- read_csv(fname)
+}
+```
+What happens if you use for (nm in names(x)) and x has no names? What if only some of the elements are named? What if the names are not unique?
+
+If the vector contains duplicate names, then x[[nm]] returns the first element with that name.
+```{r}
+x <- c(a = 11, a = 12, c = 13)
+names(x)
+```
+Write a function that prints the mean of each numeric column in a data frame, along with its name. For example, show_mean(iris) would print:
+```{r}
+show_mean(iris)
+show_mean <- function(df, digits = 2) {
+  # Get max length of all variable names in the dataset
+  maxstr <- max(str_length(names(df)))
+  for (nm in names(df)) {
+    if (is.numeric(df[[nm]])) {
+      cat(
+        str_c(str_pad(str_c(nm, ":"), maxstr + 20L, side = "right"),
+          format(mean(df[[nm]]), digits = digits, nsmall = digits),
+          sep = " "
+        ),
+        "\n"
+      )
+    }
+  }
+}
+
+?str_pad
+?format
+```
+#### str_pad
+```{r}
+rbind(
+  str_pad("hadley", 30, "left"),
+  str_pad("hadley", 20, "right"),
+  str_pad("hadley", 50, "both")
+)
+
+# All arguments are vectorised except side
+str_pad(c("a", "abc", "abcdef"), 10)
+str_pad("a", c(5, 10, 20))
+str_pad("a", 10, pad = c("-", "_", " "))
+
+# Longer strings are returned unchanged
+str_pad("hadley", 3)
+```
 
 
