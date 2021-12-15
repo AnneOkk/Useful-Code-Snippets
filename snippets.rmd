@@ -27,29 +27,13 @@ library(tidyverse)
 ```
 <div style="margin-bottom:40px;">
 </div>
+
 # R for Data Science 
-## by Hadley Wickham 
-### Chapter 1: Data visualization with ggplot2
+
+## ggplot 
+
 ```{r include = T}
-## p. 6
-# 3. 
-?mpg
-
-# 4. Scatterplot of hwy versus cyl
-ggplot(mpg, aes(x = hwy, y = cyl)) +
-  geom_point()
-
-## p.12 
-
-# 1.
-ggplot(data = mpg) +
-  geom_point(
-    mapping = aes(x = displ, y = displ), color = "pink"
-  )
-
-# 2. see class of each variable with glimpse()
-
-# 5. What does stroke do
+# What does stroke do
 ggplot(mtcars, aes(wt, mpg)) +
   geom_point(shape = 21, colour = "black", fill = "white", size = 2, stroke = 4)
 
@@ -57,126 +41,295 @@ ggplot(mtcars, aes(wt, mpg)) +
 ggplot(mpg, aes(x = displ, y = hwy, colour = displ < 6)) +
   geom_point()
 
-  
+# The variables color and clarity are ordered categorical variables. The chapter suggests visualizing a categorical and continuous variable using *frequency polygons* or *boxplots*.
+
+diamonds %>%
+  mutate(color = fct_rev(color)) %>% # I will reverse the order of the color levels so they will be in increasing order of quality on the x-axis. 
+  ggplot(aes(x = color, y = price)) +
+  geom_boxplot()
+
+ggplot(data = diamonds) +
+  geom_boxplot(mapping = aes(x = clarity, y = price))
+
+
+#For both clarity and color, there is a much larger amount of variation within each category than between categories. Carat is clearly the single best predictor of diamond prices.
 ```
 
-### Chapter 3: Data transformation with dplyr 
-* *filter* - choose certain variables only, like filter(flights, month >= 7, month <= 9)
-  + with %in%: filter(flights, month %in% 7:9)
-  + with booleans: filter(flights, dest == "IAH" | dest == "HOU")
-  + with between: filter(flights, between(month, 7, 9))
-  + with is.na: filter(flights, is.na(dep_time))
-* *arrange* - sort values 
-  + sorting in ascending order: arrange(flights, dep_delay)
-  + to put NA first: arrange(flights, desc(is.na(dep_time)), dep_time)
-* *mutate* -  calculate new variables and add them
-  + like fastest_flights <- mutate(flights, mph = distance / air_time * 60)
-  + transmute() > keep only new variables 
-  + flights_deptime <-
-  mutate(flights,
+
+### boxplot
+
+
+```{r include = T}
+#Now that we have established that carat appears to be the best predictor of price, what is the relationship between it and cut? Since this is an example of a continuous (carat) and categorical (cut) variable, it can be visualized with a box plot.
+
+ggplot(diamonds, aes(x = cut, y = carat)) +
+  geom_boxplot()
+
+#There is a lot of variability in the distribution of carat sizes within each cut category. There is a slight negative relationship between carat and cut. Noticeably, the largest carat diamonds have a cut of “Fair” (the lowest).
+```
+
+### letter-value plot:
+
+```{r include = T}
+library(lvplot)
+ggplot(diamonds, aes(x = cut, y = price)) +
+  geom_lv()
+
+#Larger datasets afford more precise estimates of *tail behavior*, but boxplots do not take advantage of this precision, instead presenting large numbers of extreme, though not unexpected, observations. Letter-value plots address this problem by including more detailed information about the tails using “letter values,” an order statistic defined by Tukey. Boxplots display the first two letter values (the median and quartiles); letter-value plots display further letter values so far as they are reliable estimates of their corresponding quantiles.
+
+```
+
+### freq plot
+
+```{r include = T}
+ggplot(data = diamonds, mapping = aes(x = price, y = ..density..)) +
+  geom_freqpoly(mapping = aes(color = cut), binwidth = 500)
+```
+
+### Histogram
+
+```{r include = T}
+ggplot(data = diamonds, mapping = aes(x = price)) +
+  geom_histogram() +
+  facet_wrap(~cut, ncol = 1, scales = "free_y")
+```
+
+### Violin plot 
+
+```{r}
+ggplot(data = diamonds, mapping = aes(x = cut, y = price)) +
+  geom_violin() +
+  coord_flip()
+```
+
+## ggplot exercises 
+* How could you rescale the count dataset above to more clearly show the distribution of cut within color, or color within cut?
+* To clearly show the distribution of cut within color, calculate a new variable prop which is the proportion of each cut within a color. This is done using a grouped mutate.
+
+```{r}
+library(viridis)
+diamonds %>%
+  count(color, cut) %>%
+  group_by(color) %>%
+  mutate(prop = n / sum(n)) %>%
+  ggplot(mapping = aes(x = color, y = cut)) +
+  geom_tile(mapping = aes(fill = prop)) +
+  scale_fill_viridis(limits = c(0, 1)) # add limit = c(0, 1) to put the color scale between (0, 1). These are the logical boundaries of proportions. 
+```
+
+
+* Use *geom_tile()* together with dplyr to explore how average flight delays vary by destination and month of year. What makes the plot difficult to read? How could you improve it?
+
+```{r}
+flights %>%
+  group_by(month, dest) %>%
+  summarise(dep_delay = mean(dep_delay, na.rm = TRUE)) %>%
+  ggplot(aes(x = factor(month), y = dest, fill = dep_delay)) +
+  geom_tile() +
+  labs(x = "Month", y = "Destination", fill = "Departure Delay")
+
+
+# better:
+
+flights %>%
+  group_by(month,dest) %>%
+  summarise(dep_delay = mean(dep_delay, na.rm = TRUE)) %>%
+  group_by(dest) %>%
+  filter(n() == 12) %>% ##delete missing data (not flying in every month)
+  ungroup() %>%
+  mutate(dest = reorder(dest, dep_delay)) %>%
+  ggplot(aes(x = factor(month), y = dest, fill = dep_delay)) +
+  geom_tile() +
+  scale_fill_viridis() +
+  labs(x = "Month", y = "Destination", fill = "Departure Delay")
+
+?reorder
+
+```
+
+#### Scatterplots
+* use *alpha aesthetics* to add transparency 
+
+```{r}
+library(ggplot2)
+ggplot(data = diamonds) + 
+  geom_point(
+    mapping = aes(x = carat, y = price),
+    alpha = 1/100
+  )
+
+# or, probably even better: use *geom_bin2d* or *geom_hex* plots:
+
+ggplot(data = diamonds) + 
+  geom_bin2d(mapping = aes(x = carat, y = price))
+
+library(hexbin)
+ggplot(data = diamonds) + 
+  geom_hex(mapping = aes(x = carat, y = price))
+
+
+# or treat one cont variable as a categorical variable and use *boxplot*:
+
+ggplot(data = diamonds, mapping = aes(x = carat, y = price)) +
+  geom_boxplot(mapping = aes(group = cut_width(carat, 0.1)))
+
+
+# in order to see hdifference in number of observations, use: *varwidth = TRUE* or use *cut_number* to display the same amount of points in each bin!
+
+ggplot(data = diamonds, mapping = aes(x = carat, y = price)) + 
+  geom_boxplot(mapping = aes(group= cut_number(carat, 20)))
+```
+
+
+#### filter
+
+* choose certain variables only
+
+```{r}
+library(nycflights13)
+data("flights")
+filter(flights, month >= 7, month <= 9)
+
+# %in%
+filter(flights, month %in% 7:9)
+
+# between
+filter(flights, between(month, 7, 9))
+
+filter(flights, dest == "IAH" | dest == "HOU")
+
+filter(flights, is.na(dep_time))
+```
+
+#### arrange 
+
+```{r}
+#sorting in ascending order: 
+arrange(flights, dep_delay)
+
+# put NA first: 
+arrange(flights, desc(is.na(dep_time)), dep_time)
+```
+
+
+#### mutate
+
+```{r}
+# calculate new variables and add them
+
+fastest_flights <- mutate(flights, mph = distance / air_time * 60)
+# transmute() to keep only new variables 
+
+fastest_flights <- transmute(flights,
     dep_time_min = (dep_time %/% 100 * 60 + dep_time %% 100) %% 1440,
     sched_dep_time_min = (sched_dep_time %/% 100 * 60 +
       sched_dep_time %% 100) %% 1440,
     dep_delay_diff = dep_delay - dep_time_min + sched_dep_time_min
   )
-* *select* - select columns by name
-  + select by variable name: fastest_flights <- select(
+
+```
+
+#### select
+
+```{r}
+# select by variable name: 
+fastest_flights <- select(
   fastest_flights, mph, distance, air_time,
   flight, origin, dest, year, month, day
 )
-  + select by column names as strings: select(flights, "dep_time", "dep_delay", "arr_time", "arr_delay")
-  + select by column numbers: select(flights, 4, 6, 7, 9)
-  + Specify the names of the variables with character vector and one_of(): 
-    + variables <- c("dep_time", "dep_delay", "arr_time", "arr_delay")
-    + select(flights, one_of(variables))
-  + starts_with: select(flights, starts_with("dep_"), starts_with("arr_"))
-  + matches: select(flights, matches("^(dep|arr)_(time|delay)$"))
-  + contains: select(flights, contains("_time"), contains("arr_"))
-  + case-sensitive selection: ignore.case = FALSE
-** *ranking*
-  + row_number(): equivalent to row index 
-  + min_rank(): assigns a rank equal to the number of values less than that tied value plus one
-  + dense_rank(): assigns a rank equal to the number of distinct values less than that tied value plus one
-  
-* *trigonometry* 
-  ++ sin, cos, tan, pi (see package Trig)
+# select by column names as strings: 
+select(flights, "dep_time", "dep_delay", "arr_time", "arr_delay")
 
-``` {r include = T, echo = T}
+#select by column numbers:
+select(flights, 4, 6, 7, 9)
 
-TRUE | FALSE
-FALSE | NA
+#Specify the names of the variables with character vector and one_of(): 
+variables <- c("dep_time", "dep_delay", "arr_time", "arr_delay")
+select(flights, one_of(variables))
 
-nycflights13::flights
+# starts_with: 
+select(flights, starts_with("dep_"), starts_with("arr_"))
 
-## a) flights with a delay of two hours or more
-(delay2hours <- filter(flights, arr_delay >= 120))
+# matches: 
+select(flights, matches("^(dep|arr)_(time|delay)$"))
 
-## b) flew to Houston 
-hou <- (houst <- filter(flights, dest %in% c("IAH", "HOU")))
+# contains: 
+select(flights, contains("_time"), contains("arr_"))
 
-## g) departed between midnight and 6am
-head(flights$time_hour)
-
-## Logarithms can be practical 
-log(99999)
-log(9)
-
+#case-sensitive selection: ignore.case = FALSE
 ```
 
-#### *group_by()* 
+#### ranking
+
+```{r}
+# row_number(): equivalent to row index 
+
+# Using row_number() with mutate() will create a column of consecutive numbers. The row_number() function is useful for creating an identification number (an ID variable). It is also useful for labeling each observation by a grouping variable.
+
+flights %>% mutate(session = row_number())
+
+flights %>% group_by(hour, dest) %>% mutate(session = row_number()) %>% arrange(., dest)
+
+#  min_rank(): assigns a rank equal to the number of values less than that tied value plus one
+# The min_rank() function is a function that returns the same values as rank when the ties_method is set to "min"
+X <- c(24,22,22,23,21)
+min_rank(X)
+#> [1] 5 2 2 4 1
+rank(X, ties.method = "min")
+#> [1] 5 2 2 4 1
+rank(X, ties.method = "max")
+#> [1] 5 3 3 4 1
+
+# dense_rank(): assigns a rank equal to the number of distinct values less than that tied value plus one
+dense_rank(X)
+```
+
+#### group_by
+
 * creates grouping variable
 * to use variable normally afterward, call ungroup()
 
-#### *lag and lead*: 
 ```{r}
-x <- c(1,1,2,2,3,4,5,6,6,7,8,9,9)
-lag(x)
-lead(x)
-x != lag(x)
+by_cyl <- mtcars %>% group_by(cyl)
+# grouping doesn't change how the data looks (apart from listing
+# how it's grouped):
+by_cyl
 
-if (require("nycflights13")) {
-carriers <- group_by(flights, carrier)
-summarise(carriers, n())
-mutate(carriers, n = n())
-filter(carriers, n() < 100)
-}
+# It changes how it acts with the other dplyr verbs:
+by_cyl %>% summarise(
+  disp = mean(disp),
+  hp = mean(hp)
+)
 
-carriers <- group_by(flights, carrier) 
-```
+by_cyl %>% filter(disp == max(disp))
 
-Convert dep_time and sched_dep_time to more convenient representation of number of minutes since midnight 
-```{r}
-head(flights$dep_time)
-head(flights$sched_dep_time)
+# Each call to summarise() removes a layer of grouping
+by_vs_am <- mtcars %>% group_by(vs, am)
+by_vs <- by_vs_am %>% summarise(n = n())
+by_vs
+by_vs %>% summarise(n = sum(n))
 
-10 %% 2.4
-```
-<<<<<<< HEAD
 
-#### *counts*
-* whenever you aggregate data, use a count to make sure that you are not making conclusions based on very small amounts of data 
+# To removing grouping, use ungroup
+by_vs %>%
+  ungroup() %>%
+  summarise(n = sum(n))
 
-=======
+# You can group by expressions: this is just short-hand for
+# a mutate/rename followed by a simple group_by
+mtcars %>% group_by(vsam = vs + am)
 
-#### *counts*
-* whenever you aggregate data, use a count to make sure that you are not making conclusions based on very small amounts of data 
+# By default, group_by overrides existing grouping
+by_cyl %>%
+  group_by(vs, am) %>%
+  group_vars()
 
->>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
-```{r}
-flights <- nycflights13::flights
-names(flights)
-library(dplyr)
+
 not_cancelled <- flights %>%
   filter(!is.na(dep_delay), !is.na(arr_delay))
 
-cancelled <- flights %>% 
-  filter(is.na(dep_delay), is.na(arr_delay))
 
-unsure <- flights %>% 
-  filter(is.na(dep_delay), is.na(arr_delay))
-
-names(not_cancelled)
-delays <- not_cancelled %>%
+delays <- not_cancelled %>% 
   group_by(month, flight, minute) %>% 
   summarize(
     delay = mean(arr_delay), delay_sd = sd(arr_delay),
@@ -191,215 +344,46 @@ delays %>%
   filter(n > 2) %>% 
   ggplot(mapping = aes(x = n, y = delay)) +
   geom_point(alpha = 1/4)
-```
 
-#### *progressively rolling up summaries*
-```{r}
+
+# progressively rolling up summaries*
 daily <- group_by(flights, year, month, day)
 (per_day <- dplyr::summarize(daily, count = n()))
 (per_month <- dplyr::summarize(per_day, count = n()))
 (per_month <- dplyr::summarize(per_day, count = n()))
 (per_month <- dplyr::summarize(per_month, count = n()))
-```
 
-#### *ungrouping* 
-* if grouping needs to be removed, use ungroup()
 
-```{r}
-daily %>% 
-  ungroup() %>%  # no longer grouped by date 
-  dplyr::summarize(flights = n())
-```
-#### *arrange* - out NA first
 
-```{r}
-arrange(flights, desc(is.na(dep_time)), dep_time) ## this works since TRUE > FALSE (1 > 0)
-```
+# Grouped Mutates (and filters)
+# Grouping is most useful in conjunction with summarise(), but you can also use it with mutate() and 
+# For example: find the worst members in a group
 
-#### *mutate* - sort to find the fastest flights 
-
-```{r}
-(fastest_flights <- mutate(flights, mph = distance / air_time * 60))
-fastest_flights <- select(
-  fastest_flights, mph, distance, air_time,
-  flight, origin, dest, year, month, day
-)
-head(arrange(fastest_flights, desc(mph)))
-
-```
-
-### Exercises
-```{r include = T, echo = T}
-desti <- dplyr::group_by(flights, dep_delay, arr_delay, origin)
-(per_desti <- dplyr::summarize(desti, mean = mean(dep_delay)))
-
-# how can you specify the following in a different way?: 
-(not_cancelled %>% count(dest)) 
-not_cancelled %>% count(tailnum, wt = distance) # wt denotes column for which should be summed 
-
-nrow(not_cancelled %>% count(tailnum, wt = distance))
-?count
-names(not_cancelled)
-(dest <- group_by(not_cancelled, dest)) 
-(summi <-  dplyr::summarize(dest, n = n()))
-
-(taili <- group_by(not_cancelled, tailnum))
-(summi <- dplyr::summarise(taili, n = sum(distance)))
-
-## tally: Any arguments to tally() are summed: 
-not_cancelled %>%
-  group_by(tailnum) %>%
-  tally(distance)
-
-## 5.6.4 
-# cancelled flights 
-cancelled <- flights %>% 
-  filter(is.na(dep_delay), is.na(arr_delay))
-
-names(cancelled)
-cancelled %>% 
-  group_by(day, arr_delay) %>%
-  summarise(n = n())
-
-?summarise
-
-(cancelled_per_day <-
-  flights %>%
-  mutate(cancelled = (is.na(arr_delay) | is.na(dep_delay))) %>%
-  group_by(year, month, day) %>%
-  summarise(
-    cancelled_num = sum(cancelled),
-    flights_num = n(),
-  ))
-
-ggplot(cancelled_per_day) +
-  geom_point(aes(x = flights_num, y = cancelled_num))
-
-names(cancelled_per_day)
-
-(cancelled_and_delays <-
-  flights %>%
-  mutate(cancelled = (is.na(arr_delay) | is.na(dep_delay))) %>%
-  group_by(year, month, day) %>%
-  summarise(
-    cancelled_prop = mean(cancelled),
-    delay_prop = mean(dep_delay, na.rm = T),
-    sth = mean(distance, na.rm = T),
-  )) %>%
-  ungroup()
-
-ggplot(cancelled_and_delays) +
-  geom_point(aes(x = delay_prop, y = cancelled_prop))
-
-names(cancelled_and_delays)
-(cancelled_and_delays_month <-
-  cancelled_and_delays %>%
-  group_by(year, month) %>%
-  summarise(
-    cancelled_pr = sum(cancelled_prop)
-  )) %>%
-  ungroup()
-
-## 5.6.5 Which carrier has the worst delays? 
-names(flights)
-(flights %>% 
-  group_by(carrier) %>% 
-  summarise(depdel = mean(dep_delay, na.rm = T),
-            arrdel = mean(arr_delay, na.rm = T)) %>% 
-    arrange(desc(depdel))
-  )
-(flights %>% 
-    group_by(carrier, dest) %>% 
-    summarise(n()))
-
-## disentangle effects of bad carriers and bad airports 
-library(dplyr)
-names(flights)
-(bam <- (flights %>%
-  filter(!is.na(arr_delay)) %>%
-  # Total delay by carrier within each origin, dest
-  group_by(origin, dest, carrier) %>%
-  summarise(
-    arr_delay = sum(arr_delay),
-    flights = n()
-  )))
-# Total delay within each origin dest
-tam <-  group_by(bam, origin, dest) %>%
-  mutate(
-    arr_delay_total = sum(arr_delay),
-    flights_total = sum(flights))
-# average delay of each carrier - average delay of other carriers
-tam %>%
-  mutate(
-    arr_delay_others = (arr_delay_total - arr_delay) /
-      (flights_total - flights),
-    arr_delay_mean = arr_delay / flights,
-    arr_delay_diff = arr_delay_mean - arr_delay_others
-  ) %>%
-# remove NaN values (when there is only one carrier)
-filter(is.finite(arr_delay_diff)) %>%
-# average over all airports it flies to
-group_by(carrier) %>%
-  summarise(arr_delay_diff = mean(arr_delay_diff)) %>%
-  arrange(desc(arr_delay_diff))
-
-?is.finite
-```
-#### remove NaN with is.finite()
-
-#### What does the sort argument count() do? 
-* It sorts the results in order of n. You could use this anytime you would run count() followed by arrange()
-
-#### Grouped Mutates (and filters)
-* Grouping is most useful in conjunction with summarise(), but you can also use it with mutate() and 
-
-For example: find the worst members in a group
-```{r}
 flights %>%
   group_by(year, month, day) %>%
   select(year, month, day, arr_delay, carrier) %>%
   filter(rank(desc(arr_delay)) < 10 )
-```
-  
-find all groups bigger than a threshold 
-```{r}
-names(flights)
+
+
+# find all groups bigger than a threshold 
 (popular_dest <- flights %>%
     group_by(dest) %>%
     filter(n() > 365) %>%
     summarize(mean = mean(arr_delay, na.rm =T))) 
 head(arrange(popular_dest, desc(mean)))
       
-names(flights)
 (unpopular_dest <- flights %>%
 group_by(dest) %>%
     filter(n() < 365) %>%
     summarize(mean = mean(arr_delay, na.rm =T))) 
 head(arrange(unpopular_dest, desc(mean)))
-```
 
-#### *standardize* to compute per group metrics:
+## How do mutate and filtering functions change when combined with grouping?
+# Summary functions (mean()), offset functions (lead(), lag()), ranking functions (min_rank(), row_number()), operate within each group when used with group_by() in mutate() or filter(). Arithmetic operators (+, -), logical operators (<, ==), modular arithmetic operators (%%, %/%), logarithmic functions (log) are not affected by group_by
 
-```{r}
-(popular_dest <- flights %>% 
-    filter(arr_delay > 0) %>%
-    mutate(prop_delay = arr_delay/ sum(arr_delay)) %>%
-    select(year:day, dest, arr_delay, prop_delay))
-```
+## Summary functions like mean(), median(), sum(), std() and others covered in the section "Useful Summary Functions" calculate their values within each group when used with mutate() or filter() and group_by().
 
-      
-#### a *grouped filter* is a grouped mutate followed by an ungrouped filter 
-* functions that work most naturally in grouped mutates and filters are called 
-* *window functions* (versus summary functions for summaries)
-vignette("window-functions")
-
-#### How do mutate and filtering functions change when combined with grouping?
-* Summary functions (mean()), offset functions (lead(), lag()), ranking functions (min_rank(), row_number()), operate within each group when used with group_by() in mutate() or filter(). Arithmetic operators (+, -), logical operators (<, ==), modular arithmetic operators (%%, %/%), logarithmic functions (log) are not affected by group_by.
-\n
-* Summary functions like mean(), median(), sum(), std() and others covered in the section "Useful Summary Functions" calculate their values within each group when used with mutate() or filter() and group_by().
-
-#### different means, depending on whether overall mean is called or group mean (by group_by)
-```{r include = T, echo=T}
+## different means, depending on whether overall mean is called or group mean (by group_by)
 (tibble(
   x = 1:9,
   group = rep(c("a", "b", "c"), each = 3)
@@ -407,9 +391,9 @@ vignette("window-functions")
   mutate(x_mean = mean(x)) %>%
   group_by(group) %>%
   mutate(x_mean_2 = mean(x)))
-```
-#### Arithmetic operators are not affected by group_by()
-```{r}
+
+
+# Arithmetic operators are not affected by group_by()
 (tibble(
   x = 1:9,
   group = rep(c("a", "b", "c"), each = 3)
@@ -417,10 +401,9 @@ vignette("window-functions")
   mutate(y = x + 2) %>%
   group_by(group) %>%
   mutate(z = x + 2))
-```
 
-#### The modular arithmetic operators %/% and %% are not affected by group_by()
-```{r}
+
+# The modular arithmetic operators %/% and %% are not affected by group_by()
 (tibble(
   x = 1:9,
   group = rep(c("a", "b", "c"), each = 3)
@@ -428,10 +411,8 @@ vignette("window-functions")
   mutate(y = x %% 2) %>%
   group_by(group) %>%
   mutate(z = x %% 2))
-```
 
-#### The logarithmic functions log(), log2(), and log10() are not affected by group_by().
-```{r}
+# The logarithmic functions log(), log2(), and log10() are not affected by group_by().
 (tibble(
   x = 1:9,
   group = rep(c("a", "b", "c"), each = 3)
@@ -439,10 +420,8 @@ vignette("window-functions")
   mutate(y = log(x)) %>%
   group_by(group) %>%
   mutate(z = log(x)))
-```
 
-#### The offset functions lead() and lag() respect the groupings in group_by(). The functions lag() and lead() will only return values within each group.
-```{r}
+# The offset functions lead() and lag() respect the groupings in group_by(). The functions lag() and lead() will only return values within each group.
 (tibble(
   x = 1:9,
   group = rep(c("a", "b", "c"), each = 3)
@@ -453,10 +432,8 @@ vignette("window-functions")
     lag_x = lag(x),
     lead_x = lead(x))
   )
-```
 
-#### The cumulative and rolling aggregate functions cumsum(), cumprod(), cummin(), cummax(), and cummean() calculate values within each group.
-```{r}
+# The cumulative and rolling aggregate functions cumsum(), cumprod(), cummin(), cummax(), and cummean() calculate values within each group.
 (tibble(
   x = 1:9,
   group = rep(c("a", "b", "c"), each = 3)
@@ -464,17 +441,8 @@ vignette("window-functions")
   mutate(x_cumsum = cumsum(x)) %>%
   group_by(group) %>%
   mutate(x_cumsum_2 = cumsum(x)))
-```
-<<<<<<< HEAD
 
-#### Logical comparisons, <, <=, >, >=, !=, and == are not affected by group_by().
-
-=======
-
-#### Logical comparisons, <, <=, >, >=, !=, and == are not affected by group_by().
-
->>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
-```{r}
+# Logical comparisons, <, <=, >, >=, !=, and == are not affected by group_by().
 (tibble(
   x = 1:9,
   y = 9:1,
@@ -483,10 +451,8 @@ vignette("window-functions")
   mutate(x_lte_y = x <= y) %>%
   group_by(group) %>%
   mutate(x_lte_y_2 = x <= y))
-```
 
-#### Ranking functions like min_rank() work within each group when used with group_by().
-```{r}
+# Ranking functions like min_rank() work within each group when used with group_by().
 (tibble(
   x = 1:9,
   group = rep(c("a", "b", "c"), each = 3)
@@ -494,28 +460,16 @@ vignette("window-functions")
   mutate(rnk = min_rank(x)) %>%
   group_by(group) %>%
   mutate(rnk2 = min_rank(x)))
-```
-<<<<<<< HEAD
 
-####  note that arrange() ignores groups when sorting values.
-
-=======
-
-####  note that arrange() ignores groups when sorting values.
-
->>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
-```{r}
+#  note that arrange() ignores groups when sorting values.
 (tibble(
   x = runif(9),
   group = rep(c("a", "b", "c"), each = 3)
 ) %>%
   group_by(group) %>%
   arrange(x))
-```
 
-#### However, the order of values from arrange() can interact with groups when used with functions that rely on the ordering of elements, such as lead(), lag(), or cumsum().
-
-```{r}
+# However, the order of values from arrange() can interact with groups when used with functions that rely on the ordering of elements, such as lead(), lag(), or cumsum().
 (tibble(
   group = rep(c("a", "b", "c"), each = 3),
   x = runif(9)
@@ -527,41 +481,9 @@ vignette("window-functions")
   mutate(lead_x = lead(x)))
 ```
 
-#### min_rank exercise 
-```{r}
-mat <- matrix(1:9, nrow = 3, ncol = 3)
-mat <- cbind(mat, c(8,2,12), c(2,3,1))
-mat
-min_rank(mat[5])
-min_rank(mat[3])
-?arrange
-?min_rank
+##### Group_by exercises 
 
-```
-
-Which plane (tailnum) has the work on time record? 
-```{r}
-on_time <- flights %>%
-  select(tailnum, arr_delay) %>%
-  group_by(tailnum) %>%
-  summarise(mean_delay = mean(arr_delay), n= n()) %>%
-  filter(n >= 20) %>%
-  arrange(desc(mean_delay))
-```
-
-The plane which few at least 20 flights with the worst on time record is:
-```{r}
-flights %>%
-  filter(!is.na(tailnum)) %>%
-  mutate(on_time = !is.na(arr_time) & (arr_delay <= 0)) %>%
-  group_by(tailnum) %>%
-  summarise(on_time = mean(on_time), n = n()) %>%
-  filter(n >= 20) %>%
-  arrange(on_time)
-
-```
-
-What time of the day should you fly when you want to avoid delays as much as possible? 
+* What time of the day should you fly when you want to avoid delays as much as possible? 
 ```{r}
 flights %>%
   group_by(hour) %>%
@@ -569,7 +491,7 @@ flights %>%
   arrange(arr_delay)
 ```
 
-For each destination, compute the total minutes of delay. For each flight, compute the proportion of the total delay for its destination.
+* For each destination, compute the total minutes of delay. For each flight, compute the proportion of the total delay for its destination.
 ```{r}
 flights %>%
   filter(arr_delay > 0) %>%
@@ -580,7 +502,7 @@ flights %>%
   arrange(dest, desc(arr_delay_prop))
 ```
 
-Delays are typically temporally correlated: even once the problem that caused the initial delay has been resolved, later flights are delayed to allow earlier flights to leave. Use lag() to explore how the delay of a flight is related to the delay of the immediately preceding flight.
+* Delays are typically temporally correlated: even once the problem that caused the initial delay has been resolved, later flights are delayed to allow earlier flights to leave. Use lag() to explore how the delay of a flight is related to the delay of the immediately preceding flight.
 ```{r}
 lagged <- flights %>%
   mutate(prev_delay = lag(dep_delay)) %>%
@@ -599,10 +521,9 @@ lagged_delays %>%
   geom_point() +
   scale_x_continuous(breaks = seq(0, 1500, by = 120)) +
   labs(y = "Departure Delay", x = "Previous Departure Delay")
-```
 
-The overall relationship looks similar in all three origin airports.
-```{r}
+#  overall relationship looks similar in all three origin airports.
+
 lagged_delays %>%
   group_by(origin, prev_delay) %>%
   summarise(dep_delay_mean = mean(dep_delay)) %>%
@@ -611,9 +532,10 @@ lagged_delays %>%
   facet_wrap(~origin, ncol = 2) +
   labs(y = "Departure Delay", x = "Previous Departure Delay")
 
+
 ```
 
-Look at each destination. Can you find flights that are suspiciously fast? (i.e. flights that represent a potential data entry error). Compute the air time of a flight relative to the shortest flight to that destination. Which flights were most delayed in the air?
+* Look at each destination. Can you find flights that are suspiciously fast? (i.e. flights that represent a potential data entry error). Compute the air time of a flight relative to the shortest flight to that destination. Which flights were most delayed in the air?
 ```{r}
 names(flights)
 flights %>%
@@ -621,11 +543,10 @@ flights %>%
   group_by(dest, origin) %>%
   summarise(mean_air = mean(air_time)) %>%
   arrange(mean_air)
-```
 
-To find unusual observations, we need to first put them on the same scale. I will standardize values by subtracting the mean from each and then dividing each by the standard deviation. \[ \mathsf{standardized}(x) = \frac{x - \mathsf{mean}(x)}{\mathsf{sd}(x)} . \] A standardized variable is often called a \(z\)-score. The units of the standardized variable are standard deviations from the mean. This will put the flight times from different routes on the same scale. The larger the magnitude of the standardized variable for an observation, the more unusual the observation is. Flights with negative values of the standardized variable are faster than the mean flight for that route, while those with positive values are slower than the mean flight for that route.
 
-```{r}
+# To find unusual observations, we need to first put them on the same scale. I will standardize values by subtracting the mean from each and then dividing each by the standard deviation. A standardized variable is often called a z-score. The units of the standardized variable are standard deviations from the mean. This will put the flight times from different routes on the same scale. The larger the magnitude of the standardized variable for an observation, the more unusual the observation is. Flights with negative values of the standardized variable are faster than the mean flight for that route, while those with positive values are slower than the mean flight for that route.
+
 standardized_flights <- flights %>%
   filter(!is.na(air_time)) %>%
   group_by(dest, origin) %>%
@@ -636,10 +557,9 @@ standardized_flights <- flights %>%
   ) %>%
   ungroup() %>%
   mutate(air_time_standard = (air_time - air_time_mean) / (air_time_sd + 1)) # 1 is added to avoid deviding by zero 
-
 ggplot(standardized_flights, aes(x = air_time_standard)) +
   geom_density()
-```
+
 
 unusually fast flights = smallest standardized values 
 ```{r}
@@ -649,9 +569,9 @@ standardized_flights %>%
     carrier, flight, origin, dest, month, air_time, air_time_mean, air_time_standard
   ) %>%
   head(10) 
-```
-A potential issue with the way that we standardized the flights is that the mean and standard deviation used to calculate are sensitive to outliers and outliers is what we are looking for. Instead of standardizing variables with the mean and variance, we could use the median as a measure of central tendency and the interquartile range (IQR) as a measure of spread. The median and IQR are more resistant to outliers than the mean and standard deviation. The following method uses the median and inter-quartile range, which are less sensitive to outliers.
-```{r}
+
+# A potential issue with the way that we standardized the flights is that the mean and standard deviation used to calculate are sensitive to outliers and outliers is what we are looking for. Instead of standardizing variables with the mean and variance, we could use the median as a measure of central tendency and the interquartile range (IQR) as a measure of spread. The median and IQR are more resistant to outliers than the mean and standard deviation. The following method uses the median and inter-quartile range, which are less sensitive to outliers.
+
 standardized_flights2 <- flights %>%
   filter(!is.na(air_time)) %>%
   group_by(dest, origin) %>%
@@ -665,7 +585,6 @@ standardized_flights2 <- flights %>%
 ggplot(standardized_flights2, aes(x = air_time_standard)) +
   geom_density()
 
-names(flights)
 flights %>%
   filter(dep_delay > 0) %>%
   mutate(mph = distance / (air_time/60)) %>%
@@ -681,7 +600,8 @@ flights %>%
   arrange(dep_delay)
 ```
 
-Find all destinations that are flown by at least two carriers. Use that information to rank the carriers.
+* Find all destinations that are flown by at least two carriers. Use that information to rank the carriers.
+
 ```{r}
 flights %>%
   # find all airports with > 1 carrier
@@ -692,9 +612,11 @@ flights %>%
   group_by(carrier) %>%
   dplyr::summarize(n_dest = n_distinct(dest)) %>%
   arrange(desc(n_dest))
+
 ```
 
-For each plane, count the number of flights before the first delay of greater than 1 hour.
+* For each plane, count the number of flights before the first delay of greater than 1 hour.
+
 ```{r}
 library(dplyr)
 flights %>%
@@ -709,209 +631,29 @@ flights %>%
   # count the number of flights == 0
   add_count(cumulative_hr_delays < 1, sort = T) 
 
-?sort
-```
 
-### Chapter 5:  Exploratory Data Analysis 
-* The *coord_cartesian()* function zooms in on the area specified by the limits, after having calculated and drawn the geoms. Since the histogram bins have already been calculated, it is unaffected
-* *density* = count standardized 
-* *Frequency Plot*: geom_freqpoly (count):
-  + is good for lookup 
-  + overlapping lines make it difficult to distinguish how overall distributions relate to each other 
-* *violin plots*: geom_violin 
-  + good for seeing overall shape of the distributions (skewness, central values, variance etc.)
-  + difficult to see which category has the highest density for a given price 
-* *Count plot*: geom_bar (shows count, x = categorical)
-* *Histogram*: geom_histogram (shows count, x = continous)
-  + good for seeing overall shape of the distributions (skewness, central values, variance etc.)
-  + difficult to see which category has the highest density for a given price 
-* *Boxplot*: geom_boxplot 
-  + shows IQR (25-75)
-  + good for seeing outliers 
-  + x = categorical, y - continous 
-  + good for ordinal (ordered) data; if not ordered, you can add order by using reorder()
-* *Letter value plot*: One problem with box plots is that they were developed in an era of much smaller datasets and tend to display a prohibitively large number of “outlying values”. One approach to remedy this problem is the letter value plot.
-  + Like box-plots, the boxes of the letter-value plot correspond to quantiles. However, they incorporate far more quantiles than box-plots. They are useful for larger datasets because,
-    + larger datasets can give precise estimates of quantiles beyond the quartiles, and
-    + in expectation, larger datasets should have more outliers (in absolute numbers).
-* *Scatterplots*: if points begin to overplot (in very large data sets), use: alpha aesthetic to add transparency 
-  + or even better: use geom_bin2d() and geom_hex() to bin two dimensions 
-* to explore *subtleties*: remove the strong relationship between two variables and see what remains; for example by plotting the residuals 
-``` {r include = T, echo - T}
-ggplot(data = mpg, mapping = aes(x = class, y = hwy)) + 
-  geom_boxplot()
-```
-#### reordering boxplot (so it's more informative)
-```{r}
-ggplot(data = mpg) + 
-  geom_boxplot(mapping = aes(
-    x = reorder (class, hwy, FUN = median),
-    y = hwy
-  )
-)
 
 ```
 
-#### flip the boxplot with coord_flip():
-```{r}
-ggplot(data = mpg) +
-  geom_boxplot(aes(
-    x = reorder(class, hwy, FUN = median),
-    y = hwy
-  )
-) + 
-coord_flip()
-```
-<<<<<<< HEAD
-
-#### relationshio between price and carat
-
-=======
-
-#### relationshio between price and carat
-
->>>>>>> d594fde4a589c9fa14833a3b665846cac818c0b6
-```{r}
-ggplot(diamonds, aes(x = carat, y = price)) +
-  geom_point()
-
-ggplot(data = diamonds, mapping = aes(x = carat, y = price)) +
-  geom_boxplot(mapping = aes(group = cut_width(carat, 0.1)))
-```
-
-#### The variables color and clarity are ordered categorical variables. The chapter suggests visualizing a categorical and continuous variable using *frequency polygons* or *boxplots*.
-```{r}
-diamonds %>%
-  mutate(color = fct_rev(color)) %>% # I will reverse the order of the color levels so they will be in increasing order of quality on the x-axis. 
-  ggplot(aes(x = color, y = price)) +
-  geom_boxplot()
-
-ggplot(data = diamonds) +
-  geom_boxplot(mapping = aes(x = clarity, y = price))
-```
-
-For both clarity and color, there is a much larger amount of variation within each category than between categories. Carat is clearly the single best predictor of diamond prices.
-
-Now that we have established that carat appears to be the best predictor of price, what is the relationship between it and cut? Since this is an example of a continuous (carat) and categorical (cut) variable, it can be visualized with a box plot.
-```{r}
-ggplot(diamonds, aes(x = cut, y = carat)) +
-  geom_boxplot()
-```
-There is a lot of variability in the distribution of carat sizes within each cut category. There is a slight negative relationship between carat and cut. Noticeably, the largest carat diamonds have a cut of “Fair” (the lowest).
-
-#### letter-value plot:
-```{r}
-library(lvplot)
-ggplot(diamonds, aes(x = cut, y = price)) +
-  geom_lv()
-```
-
-Larger datasets afford more precise estimates of *tail behavior*, but boxplots do not take advantage of this precision, instead presenting large numbers of extreme, though not unexpected, observations. Letter-value plots address this problem by including more detailed information about the tails using “letter values,” an order statistic defined by Tukey. Boxplots display the first two letter values (the median and quartiles); letter-value plots display further letter values so far as they are reliable estimates of their corresponding quantiles.
-#### freq plot
-``` {r include = T, echo - T}
-ggplot(data = diamonds, mapping = aes(x = price, y = ..density..)) +
-  geom_freqpoly(mapping = aes(color = cut), binwidth = 500)
-```
-
-#### Histogram
-```{r}
-ggplot(data = diamonds, mapping = aes(x = price)) +
-  geom_histogram() +
-  facet_wrap(~cut, ncol = 1, scales = "free_y")
-```
-
-#### Violin plot 
-```{r}
-ggplot(data = diamonds, mapping = aes(x = cut, y = price)) +
-  geom_violin() +
-  coord_flip()
-```
-There are two methods:
-* *geom_quasirandom()* produces plots that are a mix of jitter and violin plots. There are several different methods that determine exactly how the random location of the points is generated.
-* *geom_beeswarm()* produces a plot similar to a violin plot, but by offsetting the points.
-
-How could you rescale the count dataset above to more clearly show the distribution of cut within color, or color within cut?
-* To clearly show the distribution of cut within color, calculate a new variable prop which is the proportion of each cut within a color. This is done using a grouped mutate.
+#### lag and lead: 
 
 ```{r}
-library(viridis)
-diamonds %>%
-  count(color, cut) %>%
-  group_by(color) %>%
-  mutate(prop = n / sum(n)) %>%
-  ggplot(mapping = aes(x = color, y = cut)) +
-  geom_tile(mapping = aes(fill = prop)) +
-  scale_fill_viridis(limits = c(0, 1))
-```
-I add limit = c(0, 1) to put the color scale between (0, 1). These are the logical boundaries of proportions. 
+x <- c(1,1,2,2,3,4,5,6,6,7,8,9,9)
+lag(x)
+lead(x)
+x != lag(x)
 
-Use *geom_tile()* together with dplyr to explore how average flight delays vary by destination and month of year. What makes the plot difficult to read? How could you improve it?
+if (require("nycflights13")) {
+carriers <- group_by(flights, carrier)
+summarise(carriers, n())
+mutate(carriers, n = n())
+filter(carriers, n() < 100)
+}
 
-```{r}
-flights %>%
-  group_by(month, dest) %>%
-  summarise(dep_delay = mean(dep_delay, na.rm = TRUE)) %>%
-  ggplot(aes(x = factor(month), y = dest, fill = dep_delay)) +
-  geom_tile() +
-  labs(x = "Month", y = "Destination", fill = "Departure Delay")
-
-flights %>%
-  group_by(month, dest) %>%
-  summarise(dep_delay = mean(dep_delay, na.rm = TRUE)) %>%
-  ggplot(aes(x = factor(month), y = dest, fill = dep_delay)) +
-  geom_tile() +
-  labs(x = "Month", y = "Destination", fill = "Departure Delay")
+carriers <- group_by(flights, carrier) 
 ```
 
-Better: 
-```{r}
-flights %>%
-  group_by(month, dest) %>%
-  summarise(dep_delay = mean(dep_delay, na.rm = TRUE)) %>%
-  group_by(dest) %>%
-  filter(n() == 12) %>% ##delete missing data (not flying in every month)
-  ungroup() %>%
-  mutate(dest = reorder(dest, dep_delay)) %>%
-  ggplot(aes(x = factor(month), y = dest, fill = dep_delay)) +
-  geom_tile() +
-  scale_fill_viridis() +
-  labs(x = "Month", y = "Destination", fill = "Departure Delay")
 
-?reorder
-```
-#### Scatterplots
-* use *alpha aesthetics* to add transparency 
-```{r}
-library(ggplot2)
-ggplot(data = diamonds) + 
-  geom_point(
-    mapping = aes(x = carat, y = price),
-    alpha = 1/100
-  )
-```
-
-or, probably even better: use *geom_bin2d* or *geom_hex* plots:
-```{r}
-ggplot(data = diamonds) + 
-  geom_bin2d(mapping = aes(x = carat, y = price))
-
-library(hexbin)
-ggplot(data = diamonds) + 
-  geom_hex(mapping = aes(x = carat, y = price))
-```
-
-or treat one cont variable as a categorical variable and use *boxplot*:
-```{r}
-ggplot(data = diamonds, mapping = aes(x = carat, y = price)) +
-  geom_boxplot(mapping = aes(group = cut_width(carat, 0.1)))
-```
-in order to see hdifference in number of observations, use: *varwidth = TRUE*
-or use *cut_number* to display the same amount of points in each bin!
-
-```{r}
-ggplot(data = diamonds, mapping = aes(x = carat, y = price)) + 
-  geom_boxplot(mapping = aes(group= cut_number(carat, 20)))
-```
 
 ### Exercises
 * using a freq plot instead of a conditional plot
@@ -2163,7 +1905,7 @@ show_mean <- function(df, digits = 2) {
   for (nm in names(df)) {
     if (is.numeric(df[[nm]])) {
       cat(
-        str_c(str_pad(str_c(nm, ":"), maxstr + 20L, side = "right"),
+        str_c(str_pad(str_c(nm, ":"), maxstr + 5L, side = "right"),
           format(mean(df[[nm]]), digits = digits, nsmall = digits),
           sep = " "
         ),
@@ -2192,5 +1934,221 @@ str_pad("a", 10, pad = c("-", "_", " "))
 # Longer strings are returned unchanged
 str_pad("hadley", 3)
 ```
+#### format()
+```{r}
+## a list
+z <- list(a = letters[1:3], b = (-pi+0i)^((-2:2)/2), c = c(1,10,100,1000),
+          d = c("a", "longer", "character", "string"),
+          q = quote( a + b ), e = expression(1+x))
+## can you find the "2" small differences?
+(f1 <- format(z, digits = 2))
+(f2 <- format(z, digits = 2, justify = "left", trim = FALSE))
+f1 == f2 ## 2 FALSE, 4 TRUE
+
+## A "minimal" format() for S4 objects without their own format() method:
+cc <- methods::getClassDef("standardGeneric")
+format(cc) ## "<S4 class ......>"
+
+```
+What does this code do? How does it work?
+```{r}
+trans <- list(
+  disp = function(x) x * 0.0163871,
+  am = function(x) {
+    factor(x, labels = c("auto", "manual"))
+  }
+)
+
+for (var in names(trans)) {
+  mtcars[[var]] <- trans[[var]](mtcars[[var]])
+}
+
+trans
+```
+This code mutates the disp and am columns:
+
+* disp is multiplied by 0.0163871
+* am is replaced by a factor variable.
+
+The code works by looping over a named list of functions. It calls the named function in the list on the column of mtcars with the same name, and replaces the values of that column.
+
+This is a function.
+
+```{r}
+trans
+trans[["disp"]]
+
+# This applies the function to the column of mtcars with the same name:
+trans[["disp"]](mtcars[["disp"]])
+
+
+```
+#### Exercises
+Read the documentation for apply(). In the 2nd case, what two for-loops does it generalize.
+
+For an object with two-dimensions, such as a matrix or data frame, apply() replaces looping over the rows or columns of a matrix or data-frame. The apply() function is used like apply(X, MARGIN, FUN, ...), where X is a matrix or array, FUN is a function to apply, and ... are additional arguments passed to FUN.
+
+When MARGIN = 1, then the function is applied to each row. For example, the following example calculates the row means of a matrix.
+```{r}
+X <- matrix(rnorm(15), nrow = 5)
+X
+apply(X, 1, mean)
+```
+That is equivalent to this for-loop.
+```{r}
+X_row_means <- vector("numeric", length = nrow(X))
+for (i in seq_len(nrow(X))) {
+  X_row_means[[i]] <- mean(X[i, ])
+}
+X_row_means
+```
+When MARGIN = 2, apply() is equivalent to a for-loop looping over columns.
+```{r}
+apply(X, 2, mean)
+X_col_means <- vector("numeric", length = ncol(X))
+for (i in seq_len(ncol(X))) {
+  X_col_means[[i]] <- mean(X[, i])
+}
+X_col_means
+```
+Adapt col_summary() so that it only applies to numeric columns. You might want to start with an is_numeric() function that returns a logical vector that has a TRUE corresponding to each numeric column.
+```{r}
+# The original function: 
+col_summary <- function(df, fun) {
+  out <- vector("double", length(df))
+  for (i in seq_along(df)) {
+    out[i] <- fun(df[[i]])
+  }
+  out
+}
+
+# The new function: 
+col_summary2 <- function(df, fun) {
+  # create an empty vector which will store whether each
+  # column is numeric
+  numeric_cols <- vector("logical", length(df))
+  # test whether each column is numeric
+  for (i in seq_along(df)) {
+    numeric_cols[[i]] <- is.numeric(df[[i]])
+  }
+  # find the indexes of the numeric columns
+  idxs <- which(numeric_cols)
+  # find the number of numeric columns
+  n <- sum(numeric_cols)
+  # create a vector to hold the results
+  out <- vector("double", n)
+  # apply the function only to numeric vectors
+  for (i in seq_along(idxs)) {
+    out[[i]] <- fun(df[[idxs[[i]]]])
+  }
+  # name the vector
+  names(out) <- names(df)[idxs]
+  out
+}
+
+df <- tibble(
+  X1 = c(1, 2, 3),
+  X2 = c("A", "B", "C"),
+  X3 = c(0, -1, 5),
+  X4 = c(TRUE, FALSE, TRUE)
+)
+
+col_summary2(df, mean)
+?which
+
+```
+
+#### which()
+```{r}
+LETTERS
+which(LETTERS == "R")
+which(ll <- c(TRUE, FALSE, TRUE, NA, FALSE, FALSE, TRUE)) #> 1 3 7
+names(ll) <- letters[seq(ll)]
+which(ll)
+which((1:12)%%2 == 0) # which are even?
+which(1:10 > 3, arr.ind = TRUE)
+
+( m <- matrix(1:12, 3, 4) )
+div.3 <- m %% 3 == 0
+which(div.3)
+which(div.3, arr.ind = TRUE)
+rownames(m) <- paste("Case", 1:3, sep = "_")
+rownames(m)
+which(m %% 5 == 0, arr.ind = TRUE)
+
+dim(m) <- c(2, 2, 3); m
+which(div.3, arr.ind = FALSE)
+which(div.3, arr.ind = TRUE)
+
+vm <- c(m)
+dim(vm) <- length(vm) #-- funny thing with  length(dim(...)) == 1
+which(div.3, arr.ind = TRUE)
+```
+#### Exercises map()
+1. Write code that uses one of the map functions to:
+
+a. Compute the mean of every column in mtcars.
+b. Determine the type of each column in nycflights13::flights.
+c. Compute the number of unique values in each column of iris.
+d. Generate 10 random normals for each of μ=−10, 0, 10, and 100.
+
+a. 
+```{r}
+mtcars %>% 
+  map_dbl(mean)
+
+map_dbl(mtcars, mean)
+```
+
+b.
+```{r}
+map(nycflights13::flights, typeof)
+```
+
+c. 
+There is no function that directly calculates the number of unique values in a vector. For a single column, the number of unique values of a vector can be calculated like so:
+```{r}
+length(unique(iris$Species))
+```
+To apply this to all columns, we can provide the map an anonymous function. We can write anonymous function using the standard R syntax.
+```{r}
+map_int(iris, function(x) length(unique(x)))
+```
+We could also use the compact, one-sided formula shortcut that purrr provides.
+```{r}
+map_int(iris, ~ length(unique(.)))
+```
+
+d. Generate 10 random normals for each of mu = -10, 0, 10, 100
+```{r}
+map(c(-10, 0, 10, 100), ~ rnorm(n = 10, mean = .))
+```
+ 
+2. How can you create a single vector that for each column in a data frame indicates whether or not it's a factor? 
+```{r}
+is.factor(diamonds$color)
+```
+To check if each of the columns is a factor use map_*()! the result of is.factor() is logical -> map_lgl() to apply is.factor() to the columns of the data frame
+```{r}
+map_lgl(diamonds, is.factor)
+```
+3. What happens when you use the map functions on vectors that aren't lists? What does map(1:5, runif) do? Why?
+```{r}
+vector <- as_vector(1:9)
+map(vector, sum)
+map(1:5, runif)
+map(c(1.5, 6.3, 7.4), ~ rnorm(3, mean = .))
+
+
+```
+4. What does map(-2:2, rnorm, n = 5) do? Why? What does map_dbl(-2:2, rnorm, n = 5) do? Why?
+```{r}
+map(-2:2, rnorm, n = 5)
+map_dbl(-2:2, rnorm, n = 5) 
+map_dbl(-2:2, rnorm, n = 1) 
+```
+5. Rewrite the 
+
+
 
 
